@@ -22,49 +22,28 @@ RUN apt-get update --allow-insecure-repositories \
 
 RUN rm -rf /var/lib/apt/lists/*
 
+### from here: https://rocker-project.org/images/versioned/r-ver.html
+### this makes renv use pak for installation, should be faster
+RUN echo 'options(renv.config.pak.enabled = TRUE)' >> "${R_HOME}/etc/Rprofile.site"
+
 RUN install2.r --error \
 	--repos http://mirror.aarnet.edu.au/pub/CRAN/ \
 	pak \
 	renv \
 	remotes \
 	devtools 
-	# rentrez \
-	# aphid \
-	# Biostrings \
-	# ape \
-	# bold \
-	# data.table \
-	# data.tree \
-	# dplyr \
-	# entropy \
-	# taxize \
-	# tidyr \
-	# vroom \
-	# rvest \
-	# kmer \
-	# DECIPHER \
-	# readr \
-	# future \
-	# furrr \
-	# R.utils \
-	# RCurl \
-	# phytools \
-	# BiocManager \
-	# IRanges
 
+## renv.lock file has crew, nanonext and mirai packages removed
+COPY renv.lock renv.lock
 
-### needed to download the taxreturn package from Github directly and unzip
-ADD ./taxreturn-master /taxreturn-master
+### from here, "approach one": https://rstudio.github.io/renv/articles/docker.html
+ENV RENV_PATHS_LIBRARY renv/library
 
-### build package with devtools
-# RUN R -e 'install.packages("/taxreturn-master/taxreturn-master", repos = NULL, type = "source", dependencies = T)'
-# RUN R -e 'pkgbuild::build(path = "/taxreturn-master/taxreturn-master")'
-RUN R -e 'devtools::install_deps(pkg = "/taxreturn-master/taxreturn-master")'
-# RUN R -e 'devtools::build(pkg = "/taxreturn-master/taxreturn-master")'
-# RUN R -e 'devtools::install()'
+RUN R -e "renv::restore()"
 
 ### install taxreturn from Github 
-# RUN R --vanilla 'pak::pkg_install("alexpiper/taxreturn@e9dc03a")'
+# RUN R -e 'pak::pkg_install("alexpiper/taxreturn@e9dc03a")'
+# RUN R -e 'pak::pkg_install("alexpiper/seqateurs")'
 
 ## RUN R -e "pak::pkg_system_requirements('colorspace')"
 
