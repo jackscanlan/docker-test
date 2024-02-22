@@ -28,21 +28,19 @@ FROM rocker/r-ver:4.2.0
 #########################
 
 ### for Ubuntu (rocker/r-ver:4.2.0)
-RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.aarnet.edu.au/pub/ubuntu/archive|' /etc/apt/sources.list
-
-RUN apt-get update --allow-insecure-repositories \
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.aarnet.edu.au/pub/ubuntu/archive|' /etc/apt/sources.list \
+	&& apt-get update --allow-insecure-repositories \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
-		apt-utils
-
-RUN apt-get update --allow-insecure-repositories \
+		apt-utils \
+	&& apt-get update --allow-insecure-repositories \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \	
-		dpkg-dev build-essential make libclang-dev libbz2-dev bzip2 liblzma-dev libcurl4-openssl-dev libssl-dev make libgit2-dev zlib1g-dev pandoc libfreetype6-dev libjpeg-dev libpng-dev libtiff-dev libicu-dev libfontconfig1-dev libfribidi-dev libharfbuzz-dev libxml2-dev libzmq3-dev libnode-dev libglpk-dev libgmp3-dev
+		dpkg-dev build-essential make libclang-dev libbz2-dev bzip2 liblzma-dev libcurl4-openssl-dev libssl-dev make libgit2-dev zlib1g-dev pandoc libfreetype6-dev libjpeg-dev libpng-dev libtiff-dev libicu-dev libfontconfig1-dev libfribidi-dev libharfbuzz-dev libxml2-dev libzmq3-dev libnode-dev libglpk-dev libgmp3-dev \
+		ncbi-blast+ \
 ### all R packages for pipeRline: c("Biostrings","DECIPHER","ShortRead","bs4Dash","clustermq","dada2","dplyr","future","ggplot2","gridExtra","gt","magrittr","markdown","ngsReports","patchwork","phyloseq","pingr","purrr","readr","rlang","rstudioapi","savR","scales","shiny","shinyWidgets","shinybusy","stringr","tibble","tidyr","vegan","visNetwork")
 ### from pak::sysreqs: make libcurl4-openssl-dev libjpeg-dev libpng-dev libssl-dev zlib1g-dev libzmq3-dev libicu-dev libnode-dev pandoc libxml2-dev libglpk-dev libgmp3-dev
 ### including devtools: libcurl4-openssl-dev libssl-dev make libgit2-dev zlib1g-dev pandoc libfreetype6-dev libjpeg-dev libpng-dev libtiff-dev libicu-dev libfontconfig1-dev libfribidi-dev libharfbuzz-dev libxml2-dev libzmq3-dev libnode-dev libglpk-dev libgmp3-dev
 ### adding bzip2, liblzma-dev, libclang-dev and libbz2-dev because Rhtslib 2.0.0 doesn't install
-
-RUN rm -rf /var/lib/apt/lists/*
+	&& rm -rf /var/lib/apt/lists/*
 
 RUN install2.r --error \
 	--repos http://mirror.aarnet.edu.au/pub/CRAN/ \
@@ -51,32 +49,27 @@ RUN install2.r --error \
 	remotes \
 	devtools 
 
-## renv.lock file has crew, nanonext and mirai packages removed
-COPY renv.lock renv.lock
 
 ### testing install of Rhtslib:2.0.0 independently of other packages in lock file
 ### Rhtslib:2.0.0 is also known as release 3.16
-RUN R -e 'devtools::install_github("Bioconductor/Rhtslib", ref = "RELEASE_3_16")'
+RUN R -e 'devtools::install_github("Bioconductor/Rhtslib", ref = "RELEASE_3_16")' \
 ### trying to install RcppEigen:0.3.3.9.4 directly
 ### might need to update URL in future builds to pull from the package archive
-RUN R -e 'remotes::install_url("http://cran.r-project.org/src/contrib/RcppEigen_0.3.3.9.4.tar.gz")'
+	&& 'remotes::install_url("http://cran.r-project.org/src/contrib/RcppEigen_0.3.3.9.4.tar.gz")'
+## renv.lock file has crew, nanonext and mirai packages removed
+COPY renv.lock renv.lock
+
+### from here, "approach one": https://rstudio.github.io/renv/articles/docker.html
+ENV RENV_PATHS_LIBRARY="renv/library" \
+### trying to prevent buffer overflow error: https://github.com/rstudio/renv/issues/1767 
+	RENV_WATCHDOG_ENABLED=FALSE \
+### add BLAST+ to PATH
+	PATH="$PATH:/usr/bin/blastn"
 
 ### from here: https://rocker-project.org/images/versioned/r-ver.html
 ### this makes renv use pak for installation, should be faster
 RUN echo 'options(renv.config.pak.enabled = TRUE)' >> "${R_HOME}/etc/Rprofile.site"
-### from here, "approach one": https://rstudio.github.io/renv/articles/docker.html
-ENV RENV_PATHS_LIBRARY renv/library
-### trying to prevent buffer overflow error: https://github.com/rstudio/renv/issues/1767 
-ENV RENV_WATCHDOG_ENABLED FALSE
-
-RUN R -e 'renv::restore()'
-
-RUN apt-get update --allow-insecure-repositories \
-	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \	
-	ncbi-blast+
-
-### add BLAST+ to PATH
-ENV PATH="$PATH:/usr/bin/blastn"
+	&& R -e 'renv::restore()'
 
 COPY _targets_nocrew.R _targets.R
 COPY _targets_packages_nocrew.R _targets_packages.R
@@ -86,6 +79,5 @@ COPY R/themes.R themes.R
 ### Add BLAST functionality to R: https://github.com/alexpiper/taxreturn/issues/26
 ## Add the following to an R script:
 #RUN R -e 'library(taxreturn)' && '.findExecutable("blastn")'
-
 
 CMD ["/bin/bash"]
