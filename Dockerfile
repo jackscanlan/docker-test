@@ -68,7 +68,7 @@ ENV RENV_PATHS_LIBRARY="renv/library" \
 
 ### from here: https://rocker-project.org/images/versioned/r-ver.html
 ### this makes renv use pak for installation, should be faster
-RUN echo 'options(renv.config.pak.enabled = TRUE)' >> "${R_HOME}/etc/Rprofile.site"
+RUN echo 'options(renv.config.pak.enabled = TRUE)' >> "${R_HOME}/etc/Rprofile.site" \
 	&& R -e 'renv::restore()'
 
 COPY _targets_nocrew.R _targets.R
