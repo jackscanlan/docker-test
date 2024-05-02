@@ -55,7 +55,7 @@ RUN install2.r --error \
 RUN R -e 'devtools::install_github("Bioconductor/Rhtslib", ref = "RELEASE_3_16")' \
 ### trying to install RcppEigen:0.3.3.9.4 directly
 ### might need to update URL in future builds to pull from the package archive
-	&& 'remotes::install_url("http://cran.r-project.org/src/contrib/RcppEigen_0.3.3.9.4.tar.gz")'
+	&& R -e 'remotes::install_url("http://cran.r-project.org/src/contrib/RcppEigen_0.3.3.9.4.tar.gz")'
 ## renv.lock file has crew, nanonext and mirai packages removed
 COPY renv.lock renv.lock
 
