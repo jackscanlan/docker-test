@@ -1,2 +1,2 @@
-# docker-test
-Dummy repository for creating, maintaining and using a Docker container
+# piperline-docker
+Builds a Docker container for running the Piperline metabarcoding pipeline at https://github.com/alexpiper/piperline
