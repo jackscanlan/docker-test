@@ -1,0 +1,86 @@
+FROM rocker/r-ver:4.2.0
+##### Dockerfile of base image #####
+# FROM ubuntu:focal
+
+# LABEL org.opencontainers.image.licenses="GPL-2.0-or-later" \
+#       org.opencontainers.image.source="https://github.com/rocker-org/rocker-versioned2" \
+#       org.opencontainers.image.vendor="Rocker Project" \
+#       org.opencontainers.image.authors="Carl Boettiger <cboettig@ropensci.org>"
+
+# ENV R_VERSION=4.2.0
+# ENV R_HOME=/usr/local/lib/R
+# ENV TZ=Etc/UTC
+
+# COPY scripts/install_R_source.sh /rocker_scripts/install_R_source.sh
+
+# RUN /rocker_scripts/install_R_source.sh
+
+# ENV CRAN=https://p3m.dev/cran/__linux__/focal/2022-06-22
+# ENV LANG=en_US.UTF-8
+
+# COPY scripts /rocker_scripts
+
+# RUN /rocker_scripts/setup_R.sh
+
+# CMD ["R"]
+
+### rocker/r-ver:4.2.0 OS is Ubuntu 20.04" (is. "ubuntu-20.04")
+#########################
+
+### for Ubuntu (rocker/r-ver:4.2.0)
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.aarnet.edu.au/pub/ubuntu/archive|' /etc/apt/sources.list \
+	&& apt-get update --allow-insecure-repositories \
+	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \
+		apt-utils \
+	&& apt-get update --allow-insecure-repositories \
+	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated \	
+		dpkg-dev build-essential make libclang-dev libbz2-dev bzip2 liblzma-dev libcurl4-openssl-dev libssl-dev make libgit2-dev zlib1g-dev pandoc libfreetype6-dev libjpeg-dev libpng-dev libtiff-dev libicu-dev libfontconfig1-dev libfribidi-dev libharfbuzz-dev libxml2-dev libzmq3-dev libnode-dev libglpk-dev libgmp3-dev \
+		ncbi-blast+ \
+		libnng \
+### all R packages for pipeRline: c("Biostrings","DECIPHER","ShortRead","bs4Dash","clustermq","dada2","dplyr","future","ggplot2","gridExtra","gt","magrittr","markdown","ngsReports","patchwork","phyloseq","pingr","purrr","readr","rlang","rstudioapi","savR","scales","shiny","shinyWidgets","shinybusy","stringr","tibble","tidyr","vegan","visNetwork")
+### from pak::sysreqs: make libcurl4-openssl-dev libjpeg-dev libpng-dev libssl-dev zlib1g-dev libzmq3-dev libicu-dev libnode-dev pandoc libxml2-dev libglpk-dev libgmp3-dev
+### including devtools: libcurl4-openssl-dev libssl-dev make libgit2-dev zlib1g-dev pandoc libfreetype6-dev libjpeg-dev libpng-dev libtiff-dev libicu-dev libfontconfig1-dev libfribidi-dev libharfbuzz-dev libxml2-dev libzmq3-dev libnode-dev libglpk-dev libgmp3-dev
+### adding bzip2, liblzma-dev, libclang-dev and libbz2-dev because Rhtslib 2.0.0 doesn't install
+### for Dockerfile_multi, adding libnng
+	&& rm -rf /var/lib/apt/lists/*
+
+RUN install2.r --error \
+	--repos http://mirror.aarnet.edu.au/pub/CRAN/ \
+	pak \
+	renv \
+	remotes \
+	devtools 
+
+
+### testing install of Rhtslib:2.0.0 independently of other packages in lock file
+### Rhtslib:2.0.0 is also known as release 3.16
+RUN R -e 'devtools::install_github("Bioconductor/Rhtslib", ref = "RELEASE_3_16")' \
+### trying to install RcppEigen:0.3.3.9.4 directly
+### might need to update URL in future builds to pull from the package archive
+	&& R -e 'remotes::install_url("http://cran.r-project.org/src/contrib/RcppEigen_0.3.3.9.4.tar.gz")'
+## renv_multi.lock file has crew, nanonext and mirai packages included
+COPY renv_multi.lock renv_multi.lock
+
+### from here, "approach one": https://rstudio.github.io/renv/articles/docker.html
+ENV RENV_PATHS_LIBRARY="renv/library" \
+### trying to prevent buffer overflow error: https://github.com/rstudio/renv/issues/1767 
+	RENV_WATCHDOG_ENABLED=FALSE \
+### add BLAST+ to PATH
+	PATH="$PATH:/usr/bin/blastn"
+
+### from here: https://rocker-project.org/images/versioned/r-ver.html
+### this makes renv use pak for installation, should be faster
+RUN echo 'options(renv.config.pak.enabled = TRUE)' >> "${R_HOME}/etc/Rprofile.site" \
+	&& R -e 'renv::restore(lockfile = "renv_multi.lock")'
+
+## are the following necessary? If you run the pipeline in a cloned repo these should be locally available
+# COPY _targets.R _targets.R
+# COPY _targets_packages.R _targets_packages.R
+# COPY R/functions.R functions.R
+# COPY R/themes.R themes.R
+
+### Add BLAST functionality to R: https://github.com/alexpiper/taxreturn/issues/26
+## Add the following to an R script:
+#RUN R -e 'library(taxreturn)' && '.findExecutable("blastn")'
+
+CMD ["/bin/bash"]
